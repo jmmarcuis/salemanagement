@@ -41,7 +41,10 @@ class Add extends Component
     {
         // Validate form data
         $this->validate();
-
+    
+        // Dispatch loading state
+        $this->dispatch('swal:loading');
+    
         // Create new product
         $product = Product::create([
             'code' => $this->code,
@@ -51,15 +54,15 @@ class Add extends Component
             'price' => $this->price,
             'available' => $this->available,
         ]);
-
-        // Dispatch browser event for SweetAlert2 with redirect
-        $this->dispatch('swal:success:redirect', [
+    
+        // Dispatch success message with redirect
+        $this->dispatch('swal:message:redirect', [
             'title' => 'Success!',
             'text' => 'Product successfully added.',
             'icon' => 'success',
             'route' => route('inventory.index')
         ]);
-
+    
         // Reset form fields
         $this->reset(['code', 'name', 'product_type', 'quantity', 'price']);
         $this->available = 1;

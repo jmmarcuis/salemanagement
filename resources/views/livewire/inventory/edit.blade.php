@@ -108,23 +108,5 @@
         </div>
     </div>
 
-    <script>
-        document.addEventListener('livewire:initialized', () => {
-            @this.on('swal:success:redirect', (data) => {
-                Swal.fire({
-                    title: data[0].title,
-                    text: data[0].text,
-                    icon: data[0].icon,
-                    confirmButtonColor: '#3085d6',
-                    confirmButtonText: 'OK'
-                }).then((result) => {
-                    if (result.isConfirmed) {
-                        // Redirect to the index page after user clicks OK
-                        window.location.href = data[0].route;
-                    }
-                });
-            });
-
-        });
-    </script>
+    
 </div>

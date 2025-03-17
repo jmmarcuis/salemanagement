@@ -67,6 +67,9 @@ class Edit extends Component
             'available' => 'required|integer|min:0|max:1',
         ]);
 
+         // Dispatch loading state
+         $this->dispatch('swal:loading');
+
         // Get the product
         $product = Product::findOrFail($this->productId);
 
@@ -80,13 +83,14 @@ class Edit extends Component
             'available' => $this->available,
         ]);
 
-        // Dispatch browser event for SweetAlert2 with redirect
-        $this->dispatch('swal:success:redirect', [
+         // Dispatch success message with redirect
+         $this->dispatch('swal:message:redirect', [
             'title' => 'Success!',
             'text' => 'Product successfully edited.',
             'icon' => 'success',
             'route' => route('inventory.index')
         ]);
+    
     }
 
     // Method to go back to index
