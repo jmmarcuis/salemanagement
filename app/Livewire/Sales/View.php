@@ -4,6 +4,7 @@ namespace App\Livewire\Sales;
 
 use App\Models\Sale;
 use Livewire\Component;
+use Barryvdh\Snappy\Facades\SnappyPdf;
 
 class View extends Component
 {
@@ -20,6 +21,16 @@ class View extends Component
     {
         $this->sale = Sale::with(['customer', 'user', 'items.product', 'discounts'])
             ->findOrFail($this->saleId);
+    }
+
+    public function downloadPdf()
+    {
+        $sale = $this->sale;
+        $pdf = SnappyPdf::loadView('pdfs.sale', compact('sale'));
+        
+        return response()->streamDownload(function () use ($pdf) {
+            echo $pdf->output();
+        }, "sale_{$sale->id}.pdf");
     }
 
     public function render()

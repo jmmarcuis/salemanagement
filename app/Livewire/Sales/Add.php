@@ -167,7 +167,7 @@ class Add extends Component
         }
 
         // Calculate discount
-        if ($this->discountType === 'fixed') {
+        if ($this->discountType === 'FIXED') {
             $this->discountAmount = min((float)$this->discountValue, (float)$this->totalAmount);
         } else {
             $percentage = min(100, (float)$this->discountValue);

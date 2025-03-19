@@ -69,6 +69,8 @@
                 }).then((result) => {
                     if (result.isConfirmed) {
                         if (data[0].method && data[0].params) {
+                        console.log("IM CALLED!")
+                        console.log(data)
                             Livewire.dispatch(data[0].method, data[0].params);
                         }
                     }

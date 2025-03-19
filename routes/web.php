@@ -40,7 +40,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Route for adding Sales
     Route::get('/sales/add', App\Livewire\Sales\Add::class)->name('sales.add');
     // Route for Editing Sales
-    Route::get('/sales/edit/{id}', App\Livewire\Sales\Edit::class)->name('sales.edit');
+    Route::get('/sales/{id}/edit', App\Livewire\Sales\Edit::class)->name('sales.edit');
     // Route for Viewing Sales
     Route::get('/sales/view/{id}', App\Livewire\Sales\View::class)->name('sales.view');
 });

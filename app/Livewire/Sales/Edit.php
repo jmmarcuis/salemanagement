@@ -2,127 +2,177 @@
 
 namespace App\Livewire\Sales;
 
-use App\Models\Sale;
+
 use App\Models\Customer;
+use App\Models\Discount;
+use App\Models\DiscountType;
 use App\Models\Product;
+use App\Models\Sale;
+use App\Models\SaleItem;
 use App\Models\SaleStatus;
 use App\Models\VatType;
-use App\Models\DiscountType;
-use App\Models\SaleItem;
-use App\Models\Discount;
-use Livewire\Component;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Livewire\Component;
 
 class Edit extends Component
 {
-    public $sale;
+    // Main sale properties
     public $saleId;
-    public $customer_id;
-    public $status;
+    public $customerId;
     public $deadline;
     public $notes;
-    public $vat_type;
-    public $products = [];
+    public $vatType = VatType::STANDARD->value; 
+    public $status = 'pending';
+    public $showModal = false;
+    public $showCustomerModalSearch = false;
+
+    // Selected products
     public $selectedProducts = [];
-    public $discounts = [];
-    public $total_amount = 0;
-    public $discount_amount = 0;
-    public $vat_amount = 0;
-    public $grand_total = 0;
-    public $customers = [];
-    public $statuses = [];
-    public $vatTypes = [];
-    public $discountTypes = [];
-    public $availableProducts = [];
+    public $originalProducts = []; // To track changes for inventory management
+
+    // Discount properties
+    public $discountType = 'FIXED';
+    public $discountValue = 0;
+    public $discountDescription = 'Standard Discount';
+
+    // Search and display properties
+    public $searchProduct = '';
+    public $searchCustomer = '';
+    public $filteredCustomers = [];
+
+    // Totals
+    public $totalAmount = 0;
+    public $vatAmount = 0;
+    public $discountAmount = 0;
+    public $grandTotal = 0;
+
+
+    protected $listeners = [
+        'productSelected' => 'handleProductSelected',
+        'customerSelected' => 'handleCustomerSelected',
+    ];
 
     protected $rules = [
-        'customer_id' => 'required|exists:customers,id',
-        'status' => 'required',
+        'customerId' => 'required',
         'deadline' => 'nullable|date',
-        'notes' => 'nullable|string',
-        'vat_type' => 'required',
         'selectedProducts' => 'required|array|min:1',
-        'selectedProducts.*.product_id' => 'required|exists:products,id',
-        'selectedProducts.*.quantity' => 'required|numeric|min:1',
-        'selectedProducts.*.unit_price' => 'required|numeric|min:0',
-        'discounts.*.description' => 'nullable|string',
-        'discounts.*.discount_type' => 'nullable|string',
-        'discounts.*.value' => 'nullable|numeric|min:0',
+        'selectedProducts.*.quantity' => 'required|integer|min:1',
+        'discountValue' => 'nullable|numeric|min:0',
+    ];
+
+    protected $messages = [
+        'customerId.required' => 'Please select a customer',
+        'selectedProducts.required' => 'Please add at least one product',
+        'selectedProducts.min' => 'Please add at least one product',
+        'selectedProducts.*.quantity.required' => 'Quantity is required',
+        'selectedProducts.*.quantity.min' => 'Quantity must be at least 1',
     ];
 
     public function mount($id)
     {
         $this->saleId = $id;
-        $this->customers = Customer::all();
-        $this->statuses = SaleStatus::cases();
-        $this->vatTypes = VatType::cases();
-        $this->discountTypes = DiscountType::cases();
-        $this->availableProducts = Product::where('available', true)->get();
+        $sale = Sale::with(['items.product', 'customer', 'discounts'])->findOrFail($id);
+        // Load sale details
+        $this->customerId = $sale->customer_id;
+        $this->searchCustomer = $sale->customer->name;
+        $this->deadline = $sale->deadline->format('Y-m-d');
+        $this->notes = $sale->notes;
+        $this->vatType = $sale->vat_type->value; // Ensure this is the enum value
+        $this->status = $sale->status->value;
 
-        $this->loadSale();
-        $this->initializeForm();
-    }
-
-    public function loadSale()
-    {
-        $this->sale = Sale::with(['customer', 'items.product', 'discounts'])
-            ->findOrFail($this->saleId);
-    }
-
-    public function initializeForm()
-    {
-        $this->customer_id = $this->sale->customer_id;
-        $this->status = $this->sale->status->value;
-        $this->deadline = $this->sale->deadline ? $this->sale->deadline->format('Y-m-d') : null;
-        $this->notes = $this->sale->notes;
-        $this->vat_type = $this->sale->vat_type->value;
-        $this->total_amount = $this->sale->total_amount;
-        $this->discount_amount = $this->sale->discount_amount;
-        $this->vat_amount = $this->sale->vat_amount;
-        $this->grand_total = $this->sale->grand_total;
-
-        // Initialize selected products from sale items
-        $this->selectedProducts = $this->sale->items->map(function ($item) {
-            return [
-                'id' => $item->id,
+        // Load sale items
+        foreach ($sale->items as $item) {
+            $this->selectedProducts[] = [
                 'product_id' => $item->product_id,
-                'name' => $item->product->name,
-                'code' => $item->product->code,
-                'quantity' => $item->quantity,
+                'product_name' => $item->product->name,
+                'product_code' => $item->product->code,
                 'unit_price' => $item->unit_price,
-                'vat_amount' => $item->vat_amount,
+                'quantity' => $item->quantity,
+                'available_quantity' => $item->product->quantity + $item->quantity, // Add back the current quantity for validation
                 'subtotal' => $item->subtotal,
             ];
-        })->toArray();
+        }
 
-        // Initialize discounts
-        $this->discounts = $this->sale->discounts->map(function ($discount) {
+        // Store original products for inventory management
+        $this->originalProducts = collect($this->selectedProducts)->map(function ($item) {
             return [
-                'id' => $discount->id,
-                'description' => $discount->description,
-                'discount_type' => $discount->discount_type->value,
-                'value' => $discount->value,
-                'amount' => $discount->amount,
+                'product_id' => $item['product_id'],
+                'quantity' => $item['quantity']
             ];
         })->toArray();
 
-        if (empty($this->discounts)) {
-            $this->addDiscount();
+        if ($sale->discounts->isNotEmpty()) {
+            $discount = $sale->discounts->first();
+            $this->discountType = $discount->discount_type->value;
+            $this->discountValue = $discount->value;
+            $this->discountDescription = $discount->description;
+        }
+
+        $this->calculateTotals();
+    }
+
+    public function openProductModal()
+    {
+        $this->showModal = true;
+        $this->dispatch('openProductSearchModal');
+    }
+
+    public function openCustomerModal()
+    {
+        $this->showCustomerModalSearch = true;
+        $this->dispatch('openCustomerSearchModal');
+    }
+
+    public function handleCustomerSelected($customer)
+    {
+        $this->customerId = $customer['id'];
+        $this->searchCustomer = $customer['name'];
+        $this->showCustomerModalSearch = false;
+    }
+
+    public function handleProductSelected($product)
+    {
+        // Check if the product is already selected
+        $existingKey = array_search($product['id'], array_column($this->selectedProducts, 'product_id'));
+
+        if ($existingKey !== false) {
+            // Increment quantity if product already exists
+            $this->selectedProducts[$existingKey]['quantity'] += 1;
+        } else {
+            // Add the product if it doesn't exist yet
+            $this->selectedProducts[] = [
+                'product_id' => $product['id'],
+                'product_name' => $product['name'],
+                'product_code' => $product['code'],
+                'unit_price' => $product['price'],
+                'quantity' => 1,
+                'available_quantity' => $product['quantity'],
+                'subtotal' => $product['price'],
+            ];
+        }
+
+        $this->calculateTotals();
+    }
+
+    public function searchCustomers()
+    {
+        if (strlen($this->searchCustomer) >= 2) {
+            $this->filteredCustomers = Customer::where('name', 'like', '%' . $this->searchCustomer . '%')
+                ->orWhere('email', 'like', '%' . $this->searchCustomer . '%')
+                ->limit(10)
+                ->get();
+        } else {
+            $this->filteredCustomers = [];
         }
     }
 
-    public function addProduct()
+    public function selectCustomer($customerId)
     {
-        $this->selectedProducts[] = [
-            'product_id' => '',
-            'name' => '',
-            'code' => '',
-            'quantity' => 1,
-            'unit_price' => 0,
-            'vat_amount' => 0,
-            'subtotal' => 0,
-        ];
+        $this->customerId = $customerId;
+        $customer = Customer::find($customerId);
+        $this->searchCustomer = $customer->name;
+        $this->filteredCustomers = [];
     }
 
     public function removeProduct($index)
@@ -132,214 +182,160 @@ class Edit extends Component
         $this->calculateTotals();
     }
 
-    public function updatedSelectedProducts($value, $index)
+    public function updateQuantity($index, $quantity)
     {
-        // Extract the product_id and position from the nested key
-        if (strpos($index, '.product_id') !== false) {
-            $position = explode('.', $index)[0];
-            $productId = $value;
-
-            $product = $this->availableProducts->firstWhere('id', $productId);
-            if ($product) {
-                $this->selectedProducts[$position]['name'] = $product->name;
-                $this->selectedProducts[$position]['code'] = $product->code;
-                $this->selectedProducts[$position]['unit_price'] = $product->price;
-                $this->calculateProductSubtotal($position);
-            }
-        } elseif (strpos($index, '.quantity') !== false || strpos($index, '.unit_price') !== false) {
-            $position = explode('.', $index)[0];
-            $this->calculateProductSubtotal($position);
+        if ($quantity > 0 && $quantity <= $this->selectedProducts[$index]['available_quantity']) {
+            $this->selectedProducts[$index]['quantity'] = $quantity;
+            $this->selectedProducts[$index]['subtotal'] = $this->selectedProducts[$index]['unit_price'] * $quantity;
+            $this->calculateTotals();
         }
-    }
-
-    public function calculateProductSubtotal($index)
-    {
-        $product = $this->selectedProducts[$index];
-        $quantity = $product['quantity'];
-        $unitPrice = $product['unit_price'];
-
-        // Calculate VAT
-        $vatAmount = 0;
-        if ($this->vat_type === VatType::STANDARD->value) {
-            $vatAmount = $quantity * $unitPrice * 0.12; // 12% VAT
-        }
-
-        $subtotal = $quantity * $unitPrice + $vatAmount;
-
-        $this->selectedProducts[$index]['vat_amount'] = $vatAmount;
-        $this->selectedProducts[$index]['subtotal'] = $subtotal;
-
-        $this->calculateTotals();
-    }
-
-    public function addDiscount()
-    {
-        $this->discounts[] = [
-            'description' => '',
-            'discount_type' => DiscountType::FIXED->value,
-            'value' => 0,
-            'amount' => 0,
-        ];
-    }
-
-    public function removeDiscount($index)
-    {
-        unset($this->discounts[$index]);
-        $this->discounts = array_values($this->discounts);
-        $this->calculateTotals();
-    }
-
-    public function updatedDiscounts($value, $index)
-    {
-        if (strpos($index, '.discount_type') !== false || strpos($index, '.value') !== false) {
-            $position = explode('.', $index)[0];
-            $this->calculateDiscountAmount($position);
-        }
-    }
-
-    public function calculateDiscountAmount($index)
-    {
-        $discount = $this->discounts[$index];
-        $discountType = $discount['discount_type'];
-        $value = $discount['value'];
-
-        if ($discountType === DiscountType::PERCENTAGE->value) {
-            $this->discounts[$index]['amount'] = $this->total_amount * ($value / 100);
-        } else {
-            $this->discounts[$index]['amount'] = $value;
-        }
-
-        $this->calculateTotals();
     }
 
     public function calculateTotals()
     {
-        // Calculate total amount from products
-        $this->total_amount = array_reduce($this->selectedProducts, function ($carry, $product) {
-            return $carry + ($product['quantity'] * $product['unit_price']);
-        }, 0);
-
-        // Calculate VAT amount
-        $this->vat_amount = 0;
-        if ($this->vat_type === VatType::STANDARD->value) {
-            $this->vat_amount = array_reduce($this->selectedProducts, function ($carry, $product) {
-                return $carry + $product['vat_amount'];
-            }, 0);
+        $this->totalAmount = 0;
+        foreach ($this->selectedProducts as $product) {
+            $this->totalAmount += (float)$product['unit_price'] * (int)$product['quantity'];
         }
 
-        // Calculate discount amount
-        $this->discount_amount = array_reduce($this->discounts, function ($carry, $discount) {
-            return $carry + ($discount['amount'] ?? 0);
-        }, 0);
+        // Calculate VAT
+        if ($this->vatType === 'standard') {
+            $this->vatAmount = (float)$this->totalAmount * 0.12;
+        } else {
+            $this->vatAmount = 0;
+        }
 
-        // Calculate grand total
-        $this->grand_total = $this->total_amount + $this->vat_amount - $this->discount_amount;
+        // Calculate discount
+        if ($this->discountType === DiscountType::FIXED->value) { // Ensure the enum value is used
+            $this->discountAmount = min((float)$this->discountValue, (float)$this->totalAmount);
+        } else {
+            $percentage = min(100, (float)$this->discountValue);
+            $this->discountAmount = ((float)$this->totalAmount * $percentage) / 100;
+        }
+
+        // Grand total
+        $this->grandTotal = (float)$this->totalAmount + (float)$this->vatAmount - (float)$this->discountAmount;
+        $this->grandTotal = max(0, $this->grandTotal);
     }
 
-    public function updatedVatType()
+    public function updated($propertyName)
     {
-        // Recalculate VAT for all products
-        foreach ($this->selectedProducts as $index => $product) {
-            $this->calculateProductSubtotal($index);
+        $this->validateOnly($propertyName);
+
+        if (in_array($propertyName, ['discountType', 'discountValue', 'vatType'])) {
+            $this->calculateTotals();
+        }
+
+        if ($propertyName === 'searchCustomer') {
+            $this->searchCustomers();
         }
     }
 
-    public function save()
+    public function updateSale()
     {
         $this->validate();
+
+        $this->dispatch('swal:loading');
 
         try {
             DB::beginTransaction();
 
-            // Update sale record
-            $this->sale->update([
-                'customer_id' => $this->customer_id,
-                'status' => $this->status,
+            // Get the sale
+            $sale = Sale::findOrFail($this->saleId);
+
+            // Update the sale
+            $sale->update([
+                'customer_id' => $this->customerId,
+                'total_amount' => $this->totalAmount,
+                'discount_amount' => $this->discountAmount,
+                'vat_amount' => $this->vatAmount,
+                'grand_total' => $this->grandTotal,
+                'status' => SaleStatus::from($this->status),
                 'deadline' => $this->deadline,
                 'notes' => $this->notes,
-                'total_amount' => $this->total_amount,
-                'discount_amount' => $this->discount_amount,
-                'vat_amount' => $this->vat_amount,
-                'grand_total' => $this->grand_total,
-                'vat_type' => $this->vat_type,
+                'vat_type' => $this->vatType,
             ]);
 
-            // Handle sale items
-            $existingItemIds = [];
+            // Handle inventory adjustments
+            $originalProductMap = collect($this->originalProducts)->keyBy('product_id');
 
+            // First return all original quantities to inventory
+            foreach ($originalProductMap as $productId => $info) {
+                $product = Product::find($productId);
+                $product->quantity += $info['quantity'];
+                $product->save();
+            }
+
+            // Delete all existing sale items
+            SaleItem::where('sale_id', $sale->id)->delete();
+
+            // Create new sale items and adjust inventory
             foreach ($this->selectedProducts as $product) {
-                if (isset($product['id'])) {
-                    // Update existing item
-                    SaleItem::where('id', $product['id'])->update([
-                        'product_id' => $product['product_id'],
-                        'quantity' => $product['quantity'],
-                        'unit_price' => $product['unit_price'],
-                        'vat_amount' => $product['vat_amount'],
-                        'subtotal' => $product['subtotal'],
-                    ]);
-                    $existingItemIds[] = $product['id'];
+                $vatPerItem = 0;
+                if ($this->vatType === 'STANDARD') {
+                    $vatPerItem = $product['unit_price'] * $product['quantity'] * 0.12;
+                }
+
+                SaleItem::create([
+                    'sale_id' => $sale->id,
+                    'product_id' => $product['product_id'],
+                    'quantity' => $product['quantity'],
+                    'unit_price' => $product['unit_price'],
+                    'vat_amount' => $vatPerItem,
+                    'subtotal' => $product['unit_price'] * $product['quantity'],
+                ]);
+
+                // Update product quantity
+                $productModel = Product::find($product['product_id']);
+                $productModel->quantity -= $product['quantity'];
+                if ($productModel->quantity <= 0) {
+                    $productModel->available = false;
                 } else {
-                    // Create new item
-                    $saleItem = new SaleItem([
-                        'sale_id' => $this->sale->id,
-                        'product_id' => $product['product_id'],
-                        'quantity' => $product['quantity'],
-                        'unit_price' => $product['unit_price'],
-                        'vat_amount' => $product['vat_amount'],
-                        'subtotal' => $product['subtotal'],
-                    ]);
-                    $this->sale->items()->save($saleItem);
-                    $existingItemIds[] = $saleItem->id;
+                    $productModel->available = true;
                 }
+                $productModel->save();
             }
 
-            // Delete items not in the current list
-            $this->sale->items()->whereNotIn('id', $existingItemIds)->delete();
-
-            // Handle discounts
-            $existingDiscountIds = [];
-
-            foreach ($this->discounts as $discount) {
-                if (!empty($discount['description']) && !empty($discount['value'])) {
-                    if (isset($discount['id'])) {
-                        // Update existing discount
-                        Discount::where('id', $discount['id'])->update([
-                            'description' => $discount['description'],
-                            'discount_type' => $discount['discount_type'],
-                            'value' => $discount['value'],
-                            'amount' => $discount['amount'],
-                        ]);
-                        $existingDiscountIds[] = $discount['id'];
-                    } else {
-                        // Create new discount
-                        $discountModel = new Discount([
-                            'sale_id' => $this->sale->id,
-                            'description' => $discount['description'],
-                            'discount_type' => $discount['discount_type'],
-                            'value' => $discount['value'],
-                            'amount' => $discount['amount'],
-                        ]);
-                        $this->sale->discounts()->save($discountModel);
-                        $existingDiscountIds[] = $discountModel->id;
-                    }
-                }
+            // Update or create discount
+            if ($this->discountAmount > 0) {
+                Discount::updateOrCreate(
+                    ['sale_id' => $sale->id],
+                    [
+                        'description' => $this->discountDescription,
+                        'discount_type' => $this->discountType,
+                        'value' => $this->discountValue,
+                        'amount' => $this->discountAmount,
+                    ]
+                );
+            } else {
+                // Delete discount if it exists but is now zero
+                Discount::where('sale_id', $sale->id)->delete();
             }
-
-            // Delete discounts not in the current list
-            $this->sale->discounts()->whereNotIn('id', $existingDiscountIds)->delete();
 
             DB::commit();
 
-            session()->flash('message', 'Sale updated successfully.');
-            return redirect()->route('sales.view', ['id' => $this->sale->id]);
+            session()->flash('message', 'Sale updated successfully!');
+            // Dispatch success message with redirect
+            $this->dispatch('swal:message:redirect', [
+                'title' => 'Success!',
+                'text' => 'Sale successfully updated.',
+                'icon' => 'success',
+                'route' => route('sales.index')
+            ]);
+
+            $this->dispatch('refresh-sales');
         } catch (\Exception $e) {
-            DB::rollback();
+            DB::rollBack();
             session()->flash('error', 'Error updating sale: ' . $e->getMessage());
         }
     }
 
     public function render()
     {
-        return view('livewire.sales.edit')->layout('layouts.app');;
+        return view('livewire.sales.edit', [
+            'vatTypes' => VatType::cases(),
+            'discountTypes' => DiscountType::cases(),  
+            'saleStatuses' => SaleStatus::cases(),
+        ])->layout('layouts.app');
     }
 }

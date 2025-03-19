@@ -216,7 +216,7 @@
                                         class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-300 dark:border-gray-700">
                                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
                                             <span class="font-medium">VAT Type:</span>
-                                            {{ ucfirst(str_replace('_', ' ', strtolower($vatType))) }}
+                                            {{ ucfirst(str_replace('_', ' ', strtolower(string: $vatType))) }}
                                         </p>
                                         @if ($vatType === 'STANDARD')
                                             <p class="text-sm text-gray-600 dark:text-gray-400">

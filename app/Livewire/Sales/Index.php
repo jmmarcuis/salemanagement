@@ -75,6 +75,7 @@ class Index extends Component
     // Method to handle delete sale click
     public function deleteSale($id)
     {
+ 
         // Get sale details for confirmation message
         $sale = Sale::find($id);
 
@@ -94,8 +95,7 @@ class Index extends Component
 
     public function confirmDeleteSale($id)
     {
-        dd('confirmDeleteSale called');
-        // Show loading first
+         // Show loading first
         $this->dispatch('swal:loading');
 
         // Find the sale
@@ -162,7 +162,7 @@ class Index extends Component
         return [
             'refresh-sales' => '$refresh',
             'saleDeleted' => '$refresh',
-
+            'confirmDeleteSale' => 'confirmDeleteSale',
         ];
     }
 }

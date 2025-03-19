@@ -1,217 +1,263 @@
-<div class="py-6">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
-            <div class="p-6 text-gray-900 dark:text-gray-100">
-                <div class="flex justify-between items-center mb-6">
-                    <h1 class="text-2xl font-semibold">Edit Sale #{{ $sale->id }}</h1>
-                    <div>
-                        <a href="{{ route('sales.index') }}" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600">Cancel</a>
-                    </div>
+
+
+<div class="w-full h-full">
+    <div class="py-12">
+        <div class="max-w-8xl mx-auto sm:px-6 lg:px-8">
+            <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm sm:rounded-lg">
+                <div class="p-6 text-gray-900 dark:text-gray-100">
+                    <h3 class="text-xl font-semibold mb-6">Edit Sale #{{ $saleId }}</h3>
+
+                    <form wire:submit.prevent="updateSale">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                            <!-- Customer Selection -->
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Customer</label>
+                                <div class="relative">
+                                    <button type="button" wire:click="openCustomerModal"
+                                        class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-left flex items-center">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-gray-400"
+                                            fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                        <!-- Conditional display based on whether a customer is selected -->
+                                        @if ($customerId)
+                                            <span class="text-gray-900 dark:text-gray-100">{{ $searchCustomer }}</span>
+                                        @else
+                                            <span class="text-gray-500 dark:text-gray-400">Click to search and select
+                                                customers...</span>
+                                        @endif
+                                    </button>
+                                </div>
+                                @error('customerId')
+                                    <span class="text-red-500 text-sm">{{ $message }}</span>
+                                @enderror
+                            </div>
+                            <!-- Deadline -->
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Order Deadline</label>
+                                <input type="date" wire:model="deadline"
+                                    class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                @error('deadline')
+                                    <span class="text-red-500 text-sm">{{ $message }}</span>
+                                @enderror
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+                            <!-- Status -->
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Status</label>
+                                <select wire:model="status"
+                                    class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                    @foreach ($saleStatuses as $saleStatus)
+                                        <option value="{{ $saleStatus->value }}">{{ ucfirst($saleStatus->value) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <!-- VAT Type -->
+                            <div>
+                                <label class="block text-sm font-medium mb-1">VAT Type</label>
+                                <select wire:model.live="vatType"
+                                    class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                    @foreach ($vatTypes as $vType)
+                                        <option value="{{ $vType->value }}">
+                                            {{ ucfirst(str_replace('_', ' ', strtolower($vType->value))) }}
+                                        </option>
+                                    @endforeach
+                                </select>
+                            </div>
+
+                            <!-- Notes -->
+                            <div>
+                                <label class="block text-sm font-medium mb-1">Notes</label>
+                                <input type="text" wire:model="notes" placeholder="Additional notes"
+                                    class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                            </div>
+                        </div>
+
+                        <!-- Product Search Button -->
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium mb-1">Add Products</label>
+                            <button type="button" wire:click="openProductModal"
+                                class="w-full p-2 border border-gray-300 dark:border-gray-700 rounded-md bg-white dark:bg-gray-900 text-left flex items-center">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2 text-gray-400"
+                                    fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                </svg>
+                                <span class="text-gray-500 dark:text-gray-400">Click to search and select
+                                    products...</span>
+                            </button>
+                            @error('selectedProducts')
+                                <span class="text-red-500 text-sm">{{ $message }}</span>
+                            @enderror
+                        </div>
+                        <!-- Selected Products -->
+                        <div class="mb-6">
+                            <h4 class="text-lg font-medium mb-2">Selected Products</h4>
+                            <div class="overflow-x-auto">
+                                <table
+                                    class="min-w-full bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700">
+                                    <thead>
+                                        <tr class="bg-gray-100 dark:bg-gray-700">
+                                            <th class="py-3 px-4 border-b text-left">Code</th>
+                                            <th class="py-3 px-4 border-b text-left">Product</th>
+                                            <th class="py-3 px-4 border-b text-right">Unit Price</th>
+                                            <th class="py-3 px-4 border-b text-center">Quantity</th>
+                                            <th class="py-3 px-4 border-b text-right">Subtotal</th>
+                                            <th class="py-3 px-4 border-b text-center">Action</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        @forelse($selectedProducts as $index => $product)
+                                            <tr
+                                                class="hover:bg-gray-50 dark:hover:bg-gray-700 border-b dark:border-gray-700">
+                                                <td class="py-3 px-4">{{ $product['product_code'] }}</td>
+                                                <td class="py-3 px-4">{{ $product['product_name'] }}</td>
+                                                <td class="py-3 px-4 text-right">₱
+                                                    {{ number_format($product['unit_price'], 2) }}</td>
+                                                <td class="py-3 px-4 text-center">
+                                                    <input type="number" min="1"
+                                                        max="{{ $product['available_quantity'] }}"
+                                                        value="{{ $product['quantity'] }}"
+                                                        wire:change="updateQuantity({{ $index }}, $event.target.value)"
+                                                        class="w-20 text-center rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                                    @error("selectedProducts.{$index}.quantity")
+                                                        <span class="text-red-500 text-xs block">{{ $message }}</span>
+                                                    @enderror
+                                                </td>
+                                                <td class="py-3 px-4 text-right">₱
+                                                    {{ number_format($product['subtotal'], 2) }}</td>
+                                                <td class="py-3 px-4 text-center">
+                                                    <button type="button"
+                                                        wire:click="removeProduct({{ $index }})"
+                                                        class="text-red-600 hover:text-red-900">
+                                                        Remove
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        @empty
+                                            <tr>
+                                                <td colspan="6"
+                                                    class="py-6 text-center text-gray-500 dark:text-gray-400">No
+                                                    products selected</td>
+                                            </tr>
+                                        @endforelse
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Discount Section -->
+                        <div class="mb-6">
+                            <h4 class="text-lg font-medium mb-2">Discount</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Discount Type</label>
+                                    <select wire:model.live="discountType"
+                                        class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                        @foreach ($discountTypes as $dType)
+                                            <option value="{{ $dType->value }}">
+                                                {{ ucfirst(strtolower($dType->value)) }}</option>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Discount Value</label>
+                                    <input type="number" wire:model.live="discountValue" min="0"
+                                        @if ($discountType === 'percentage') max="100" @endif
+                                        placeholder="{{ $discountType === 'percentage' ? 'Percentage' : 'Amount' }}"
+                                        class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                    @error('discountValue')
+                                        <span class="text-red-500 text-sm">{{ $message }}</span>
+                                    @enderror
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium mb-1">Discount Description</label>
+                                    <input type="text" wire:model="discountDescription" placeholder="Description"
+                                        class="w-full rounded-md border-gray-300 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-300">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Totals Section -->
+                        <div class="mb-6 bg-gray-50 dark:bg-gray-700 p-4 rounded-lg">
+                            <h4 class="text-lg font-medium mb-4">Order Summary</h4>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <!-- Breakdown of costs -->
+                                    <div class="space-y-2">
+                                        <div class="flex justify-between">
+                                            <span>Subtotal:</span>
+                                            <span>₱ {{ number_format($totalAmount, 2) }}</span>
+                                        </div>
+                                        @if ($discountAmount > 0)
+                                            <div class="flex justify-between text-red-600 dark:text-red-400">
+                                                <span>Discount:</span>
+                                                <span>- ₱ {{ number_format($discountAmount, 2) }}</span>
+                                            </div>
+                                        @endif
+                                        @if ($vatAmount > 0)
+                                            <div class="flex justify-between">
+                                                <span>VAT (12%):</span>
+                                                <span>₱ {{ number_format($vatAmount, 2) }}</span>
+                                            </div>
+                                        @endif
+                                        <div
+                                            class="flex justify-between font-bold text-lg pt-2 border-t border-gray-300 dark:border-gray-600">
+                                            <span>Total:</span>
+                                            <span>₱ {{ number_format($grandTotal, 2) }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <!-- Additional information -->
+                                    <div
+                                        class="bg-white dark:bg-gray-800 p-4 rounded-lg border border-gray-300 dark:border-gray-700">
+                                        <p class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+                                            <span class="font-medium">VAT Type:</span>
+                                            {{ ucfirst(str_replace('_', ' ', strtolower($vatType))) }}
+                                        </p>
+
+                                        @if ($vatTypes === App\Models\VatType::STANDARD->value)
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                                Standard VAT rate of 12% will be applied to this order.
+                                            </p>
+                                            @elseif ($vatTypes === App\Models\VatType::ZERO_RATED->value)
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                                                Zero-rated VAT applies to specific goods and services as per Philippines
+                                                tax laws.
+                                            </p>
+                                            @elseif ($vatTypes === App\Models\VatType::VAT_EXEMPT->value)
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">
+                                                This transaction is exempt from VAT as per Philippines tax regulations.
+                                            </p>
+                                        @endif
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Action Buttons -->
+                        <div class="flex justify-end space-x-3">
+                            <a href="{{ route('sales.index') }}"
+                                class="px-4 py-2 bg-gray-300 dark:bg-gray-600 rounded-md text-gray-800 dark:text-gray-200 hover:bg-gray-400 dark:hover:bg-gray-500 transition">
+                                Cancel
+                            </a>
+                            <button type="submit"
+                                class="px-4 py-2 bg-blue-600 rounded-md text-white hover:bg-blue-700 transition"
+                                @if (empty($selectedProducts)) disabled @endif>
+                                Update Sale
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
-                @if (session()->has('message'))
-                    <div class="mb-4 p-4 bg-green-100 text-green-700 rounded-md">
-                        {{ session('message') }}
-                    </div>
-                @endif
-
-                @if (session()->has('error'))
-                    <div class="mb-4 p-4 bg-red-100 text-red-700 rounded-md">
-                        {{ session('error') }}
-                    </div>
-                @endif
-
-                <form wire:submit.prevent="save">
-                    <!-- Sale Information Section -->
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-md p-6 mb-6">
-                        <h2 class="text-lg font-medium mb-4">Sale Information</h2>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div>
-                                <label for="customer_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Customer</label>
-                                <select id="customer_id" wire:model="customer_id" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                    <option value="">Select Customer</option>
-                                    @foreach ($customers as $customer)
-                                        <option value="{{ $customer->id }}">{{ $customer->name }}</option>
-                                    @endforeach
-                                </select>
-                                @error('customer_id') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-
-                            <div>
-                                <label for="status" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                                <select id="status" wire:model="status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                    @foreach ($statuses as $statusOption)
-                                        <option value="{{ $statusOption->value }}">{{ ucfirst($statusOption->value) }}</option>
-                                    @endforeach
-                                </select>
-                                @error('status') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-
-                            <div>
-                                <label for="deadline" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deadline</label>
-                                <input type="date" id="deadline" wire:model="deadline" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                @error('deadline') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-
-                            <div>
-                                <label for="vat_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">VAT Type</label>
-                                <select id="vat_type" wire:model="vat_type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                    @foreach ($vatTypes as $vatTypeOption)
-                                        <option value="{{ $vatTypeOption->value }}">{{ str_replace('_', ' ', ucfirst($vatTypeOption->value)) }}</option>
-                                    @endforeach
-                                </select>
-                                @error('vat_type') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-
-                            <div class="md:col-span-2">
-                                <label for="notes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
-                                <textarea id="notes" wire:model="notes" rows="3" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600"></textarea>
-                                @error('notes') <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Products Section -->
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-md p-6 mb-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-medium">Products</h2>
-                            <button type="button" wire:click="addProduct" class="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                                Add Product
-                            </button>
-                        </div>
-                        
-                        @error('selectedProducts') <span class="text-red-500 text-sm block mb-2">{{ $message }}</span> @enderror
-                        
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                                <thead>
-                                    <tr class="bg-gray-100 dark:bg-gray-700">
-                                        <th class="py-3 px-4 text-left">Product</th>
-                                        <th class="py-3 px-4 text-right">Unit Price</th>
-                                        <th class="py-3 px-4 text-right">Quantity</th>
-                                        <th class="py-3 px-4 text-right">VAT Amount</th>
-                                        <th class="py-3 px-4 text-right">Subtotal</th>
-                                        <th class="py-3 px-4 text-center">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @forelse($selectedProducts as $index => $product)
-                                    <tr class="border-t border-gray-200 dark:border-gray-700">
-                                        <td class="py-3 px-4">
-                                            <select wire:model="selectedProducts.{{ $index }}.product_id" wire:change="updatedSelectedProducts($event.target.value, '{{ $index }}.product_id')" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                                <option value="">Select Product</option>
-                                                @foreach ($availableProducts as $availableProduct)
-                                                    <option value="{{ $availableProduct->id }}">{{ $availableProduct->name }} ({{ $availableProduct->code }})</option>
-                                                @endforeach
-                                            </select>
-                                            @error("selectedProducts.{$index}.product_id") <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                        </td>
-                                        <td class="py-3 px-4">
-                                            <input type="number" step="0.01" wire:model="selectedProducts.{{ $index }}.unit_price" wire:change="updatedSelectedProducts($event.target.value, '{{ $index }}.unit_price')" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                            @error("selectedProducts.{$index}.unit_price") <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                        </td>
-                                        <td class="py-3 px-4">
-                                            <input type="number" min="1" wire:model="selectedProducts.{{ $index }}.quantity" wire:change="updatedSelectedProducts($event.target.value, '{{ $index }}.quantity')" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                            @error("selectedProducts.{$index}.quantity") <span class="text-red-500 text-sm">{{ $message }}</span> @enderror
-                                        </td>
-                                        <td class="py-3 px-4 text-right">₱ {{ number_format($product['vat_amount'] ?? 0, 2) }}</td>
-                                        <td class="py-3 px-4 text-right">₱ {{ number_format($product['subtotal'] ?? 0, 2) }}</td>
-                                        <td class="py-3 px-4 text-center">
-                                            <button type="button" wire:click="removeProduct({{ $index }})" class="text-red-600 hover:text-red-900">
-                                                Remove
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    @empty
-                                    <tr>
-                                        <td colspan="6" class="py-4 text-center text-gray-500 dark:text-gray-400">No products added</td>
-                                    </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Discounts Section -->
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-md p-6 mb-6">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-lg font-medium">Discounts</h2>
-                            <button type="button" wire:click="addDiscount" class="px-3 py-1 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                                Add Discount
-                            </button>
-                        </div>
-                        
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700">
-                                <thead>
-                                    <tr class="bg-gray-100 dark:bg-gray-700">
-                                        <th class="py-3 px-4 text-left">Description</th>
-                                        <th class="py-3 px-4 text-left">Type</th>
-                                        <th class="py-3 px-4 text-right">Value</th>
-                                        <th class="py-3 px-4 text-right">Amount</th>
-                                        <th class="py-3 px-4 text-center">Action</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($discounts as $index => $discount)
-                                    <tr class="border-t border-gray-200 dark:border-gray-700">
-                                        <td class="py-3 px-4">
-                                            <input type="text" wire:model="discounts.{{ $index }}.description" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                        </td>
-                                        <td class="py-3 px-4">
-                                            <select wire:model="discounts.{{ $index }}.discount_type" wire:change="updatedDiscounts($event.target.value, '{{ $index }}.discount_type')" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                                @foreach ($discountTypes as $discountType)
-                                                    <option value="{{ $discountType->value }}">{{ $discountType->value }}</option>
-                                                @endforeach
-                                            </select>
-                                        </td>
-                                        <td class="py-3 px-4">
-                                            <input type="number" step="0.01" min="0" wire:model="discounts.{{ $index }}.value" wire:change="updatedDiscounts($event.target.value, '{{ $index }}.value')" class="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 dark:bg-gray-800 dark:border-gray-600">
-                                        </td>
-                                        <td class="py-3 px-4 text-right">₱ {{ number_format($discount['amount'] ?? 0, 2) }}</td>
-                                        <td class="py-3 px-4 text-center">
-                                            <button type="button" wire:click="removeDiscount({{ $index }})" class="text-red-600 hover:text-red-900">
-                                                Remove
-                                            </button>
-                                        </td>
-                                    </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Summary -->
-                    <div class="bg-gray-50 dark:bg-gray-700 rounded-md p-6 mb-6">
-                        <h2 class="text-lg font-medium mb-4">Sale Summary</h2>
-                        <div class="space-y-2 max-w-md ml-auto">
-                            <div class="flex justify-between">
-                                <span>Total Amount:</span>
-                                <span class="font-medium">₱ {{ number_format($total_amount, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span>Discount Amount:</span>
-                                <span class="font-medium">- ₱ {{ number_format($discount_amount, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span>VAT Amount:</span>
-                                <span class="font-medium">₱ {{ number_format($vat_amount, 2) }}</span>
-                            </div>
-                            <div class="flex justify-between border-t border-gray-300 dark:border-gray-600 pt-2 mt-2">
-                                <span class="font-bold">Grand Total:</span>
-                                <span class="font-bold">₱ {{ number_format($grand_total, 2) }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Submit Button -->
-                    <div class="flex justify-end">
-                        <button type="submit" class="px-6 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600">
-                            Update Sale
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     </div>
+    @livewire('product-search-modal')
+    @livewire('customer-search-modal')
 </div>
